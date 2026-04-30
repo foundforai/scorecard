@@ -4,7 +4,8 @@ import Head from 'next/head';
 const FORMSPREE = 'https://formspree.io/f/mpqwvlnz';
 const BOOKING_URL = 'https://foundforai.com/book-call';
 const QUOTE_EMAIL = 'info@foundforai.com';
-const QUOTE_MAILTO = `mailto:${QUOTE_EMAIL}?subject=Done-For-You%20Quote%20Request&body=Hi%20FoundForAI%20team%2C%20I%20just%20ran%20my%20AI%20Visibility%20Report%20and%20would%20like%20a%20done-for-you%20quote.`;
+const QUOTE_FORM_ENDPOINT = FORMSPREE;
+const INTENT_PING_ENDPOINT = FORMSPREE;
 
 function trackCta(ctaId) {
   if (typeof window === 'undefined') return;
@@ -113,12 +114,63 @@ function QuickScorecard({ quickScore }) {
 }
 
 // ── Post-Report CTA ───────────────────────────────────────────────────────────
-function PostReportCTA() {
+function PostReportCTA({ userEmail = '', reportUrl = '', reportScore = 0 }) {
+  const [formOpen, setFormOpen] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [submitted, setSubmitted] = useState(false);
+  const [submitError, setSubmitError] = useState('');
+  const intentFiredRef = useRef(false);
+
   const trustBullets = [
     'No pitch — we review your report live',
     'Custom 30-day fix roadmap',
     '15 minutes, free, no credit card',
   ];
+
+  const handleQuoteButtonClick = () => {
+    trackCta('post_report_quote_button_click');
+    const willOpen = !formOpen;
+    setFormOpen(willOpen);
+
+    if (willOpen && !intentFiredRef.current) {
+      intentFiredRef.current = true;
+      fetch(INTENT_PING_ENDPOINT, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+        body: JSON.stringify({
+          intent: 'quote_button_clicked',
+          intent_only: true,
+          email: userEmail,
+          website: reportUrl,
+          report_score: reportScore,
+        }),
+      }).catch(() => {});
+    }
+  };
+
+  const handleFormSubmit = async (e) => {
+    e.preventDefault();
+    if (submitting) return;
+    setSubmitting(true);
+    setSubmitError('');
+
+    const fd = new FormData(e.currentTarget);
+    const payload = Object.fromEntries(fd.entries());
+
+    try {
+      const res = await fetch(QUOTE_FORM_ENDPOINT, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      if (!res.ok) throw new Error('submit_failed');
+      trackCta('post_report_quote_form_submit');
+      setSubmitted(true);
+    } catch (err) {
+      setSubmitError(`Something went wrong. Please email ${QUOTE_EMAIL} directly.`);
+    }
+    setSubmitting(false);
+  };
 
   return (
     <div className="bg-blue-50 rounded-2xl border border-blue-100 shadow-sm p-6 sm:p-8 no-print">
@@ -140,15 +192,101 @@ function PostReportCTA() {
         >
           Walk Me Through My Report — Book Free 15-Min Review
         </a>
-        <a
-          href={QUOTE_MAILTO}
-          onClick={() => trackCta('post_report_quote_email')}
-          aria-label="Email FoundForAI for a done-for-you quote"
+        <button
+          type="button"
+          onClick={handleQuoteButtonClick}
+          aria-label="Request a done-for-you quote"
+          aria-expanded={formOpen}
+          aria-controls="quote-form-panel"
           className="sm:flex-1 bg-white hover:bg-gray-50 text-gray-700 font-semibold py-3 px-5 rounded-xl text-sm border border-gray-200 transition flex items-center justify-center gap-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
         >
           Email Me a Done-For-You Quote
-        </a>
+        </button>
       </div>
+
+      {formOpen && (
+        <div id="quote-form-panel" className="mt-5 bg-white rounded-xl border border-blue-100 shadow-sm p-5">
+          {submitted ? (
+            <div className="flex items-start gap-3" role="status" aria-live="polite">
+              <CheckIcon />
+              <p className="text-sm text-gray-700 leading-relaxed pt-2">
+                Got it — we&apos;ll email your custom quote within 1 business day.
+              </p>
+            </div>
+          ) : (
+            <form onSubmit={handleFormSubmit} className="space-y-3">
+              <div>
+                <label htmlFor="quote-name" className="block text-xs font-semibold text-gray-600 mb-1">
+                  Name
+                </label>
+                <input
+                  id="quote-name"
+                  name="name"
+                  type="text"
+                  required
+                  disabled={submitting}
+                  className="w-full px-3 py-2.5 text-sm text-gray-900 placeholder-gray-400 bg-white border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                />
+              </div>
+              <div>
+                <label htmlFor="quote-email" className="block text-xs font-semibold text-gray-600 mb-1">
+                  Email
+                </label>
+                <input
+                  id="quote-email"
+                  name="email"
+                  type="email"
+                  required
+                  defaultValue={userEmail}
+                  disabled={submitting}
+                  className="w-full px-3 py-2.5 text-sm text-gray-900 placeholder-gray-400 bg-white border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                />
+              </div>
+              <div>
+                <label htmlFor="quote-website" className="block text-xs font-semibold text-gray-600 mb-1">
+                  Website
+                </label>
+                <input
+                  id="quote-website"
+                  name="website"
+                  type="text"
+                  defaultValue={reportUrl}
+                  disabled={submitting}
+                  className="w-full px-3 py-2.5 text-sm text-gray-900 placeholder-gray-400 bg-white border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                />
+              </div>
+
+              <input type="hidden" name="report_score" defaultValue={String(reportScore)} />
+              <input type="hidden" name="report_url" defaultValue={reportUrl} />
+              <input type="hidden" name="source" defaultValue="post_report_quote_request" />
+
+              {submitError && (
+                <p className="text-xs text-red-600 bg-red-50 border border-red-100 rounded-lg px-3 py-2" role="alert">
+                  {submitError}
+                </p>
+              )}
+
+              <button
+                type="submit"
+                disabled={submitting}
+                className="w-full bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white font-semibold py-3 rounded-xl text-sm transition flex items-center justify-center gap-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+              >
+                {submitting ? (
+                  <>
+                    <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24" aria-hidden="true">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                    </svg>
+                    Sending…
+                  </>
+                ) : (
+                  'Send Me My Quote'
+                )}
+              </button>
+            </form>
+          )}
+        </div>
+      )}
 
       <ul className="mt-5 grid grid-cols-1 sm:grid-cols-3 gap-2 sm:gap-4">
         {trustBullets.map((bullet) => (
@@ -165,7 +303,7 @@ function PostReportCTA() {
 }
 
 // ── Full Report ───────────────────────────────────────────────────────────────
-function FullReport({ data }) {
+function FullReport({ data, userEmail }) {
   const priorityColor = { high: 'bg-red-50 text-red-700 border-red-200', medium: 'bg-amber-50 text-amber-700 border-amber-200', low: 'bg-blue-50 text-blue-700 border-blue-200' };
   const priorityLabel = { high: 'High priority', medium: 'Medium', low: 'Low' };
 
@@ -268,7 +406,11 @@ function FullReport({ data }) {
       )}
 
       {/* Post-Report Conversion CTA */}
-      <PostReportCTA />
+      <PostReportCTA
+        userEmail={userEmail}
+        reportUrl={data.url}
+        reportScore={data.overallScore}
+      />
 
       {/* Footer */}
       <div className="text-center py-4 no-print">
@@ -551,7 +693,7 @@ export default function Home() {
                 {/* Full Report */}
                 {showFullReport && (
                   <div ref={reportRef}>
-                    <FullReport data={result} />
+                    <FullReport data={result} userEmail={email} />
                   </div>
                 )}
               </div>

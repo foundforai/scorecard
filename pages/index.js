@@ -2,6 +2,15 @@ import { useState, useRef } from 'react';
 import Head from 'next/head';
 
 const FORMSPREE = 'https://formspree.io/f/mpqwvlnz';
+const BOOKING_URL = 'https://foundforai.com/book-call';
+const QUOTE_EMAIL = 'info@foundforai.com';
+const QUOTE_MAILTO = `mailto:${QUOTE_EMAIL}?subject=Done-For-You%20Quote%20Request&body=Hi%20FoundForAI%20team%2C%20I%20just%20ran%20my%20AI%20Visibility%20Report%20and%20would%20like%20a%20done-for-you%20quote.`;
+
+function trackCta(ctaId) {
+  if (typeof window === 'undefined') return;
+  window.dataLayer = window.dataLayer || [];
+  window.dataLayer.push({ event: 'cta_click', cta_id: ctaId });
+}
 
 // ── Icons ─────────────────────────────────────────────────────────────────────
 function CheckIcon() {
@@ -99,6 +108,58 @@ function QuickScorecard({ quickScore }) {
           {item.found ? <CheckIcon /> : <XIcon />}
         </div>
       ))}
+    </div>
+  );
+}
+
+// ── Post-Report CTA ───────────────────────────────────────────────────────────
+function PostReportCTA() {
+  const trustBullets = [
+    'No pitch — we review your report live',
+    'Custom 30-day fix roadmap',
+    '15 minutes, free, no credit card',
+  ];
+
+  return (
+    <div className="bg-blue-50 rounded-2xl border border-blue-100 shadow-sm p-6 sm:p-8 no-print">
+      <h3 className="text-2xl sm:text-3xl font-bold text-gray-900 leading-tight tracking-tight">
+        You&apos;ve got your roadmap. Want us to handle the fixes?
+      </h3>
+      <p className="text-sm sm:text-base text-gray-500 mt-2 leading-relaxed">
+        We&apos;ll walk you through your report live and give you a custom 30-day plan to get cited by ChatGPT, Gemini, Perplexity, and Claude.
+      </p>
+
+      <div className="flex flex-col sm:flex-row gap-3 mt-6">
+        <a
+          href={BOOKING_URL}
+          target="_blank"
+          rel="noopener"
+          onClick={() => trackCta('post_report_book_call')}
+          aria-label="Book a free 15-minute AI Visibility Review"
+          className="sm:flex-1 bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 px-5 rounded-xl text-sm transition flex items-center justify-center gap-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+        >
+          Walk Me Through My Report — Book Free 15-Min Review
+        </a>
+        <a
+          href={QUOTE_MAILTO}
+          onClick={() => trackCta('post_report_quote_email')}
+          aria-label="Email FoundForAI for a done-for-you quote"
+          className="sm:flex-1 bg-white hover:bg-gray-50 text-gray-700 font-semibold py-3 px-5 rounded-xl text-sm border border-gray-200 transition flex items-center justify-center gap-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+        >
+          Email Me a Done-For-You Quote
+        </a>
+      </div>
+
+      <ul className="mt-5 grid grid-cols-1 sm:grid-cols-3 gap-2 sm:gap-4">
+        {trustBullets.map((bullet) => (
+          <li key={bullet} className="flex items-center gap-2 text-xs text-gray-600">
+            <svg className="w-4 h-4 text-green-600 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5} aria-hidden="true">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+            </svg>
+            <span>{bullet}</span>
+          </li>
+        ))}
+      </ul>
     </div>
   );
 }
@@ -205,6 +266,9 @@ function FullReport({ data }) {
           </div>
         </div>
       )}
+
+      {/* Post-Report Conversion CTA */}
+      <PostReportCTA />
 
       {/* Footer */}
       <div className="text-center py-4 no-print">
@@ -468,6 +532,21 @@ export default function Home() {
                     </button>
                   )}
                 </div>
+
+                {!showFullReport && (
+                  <p className="text-center text-sm text-gray-500 no-print -mt-1">
+                    Prefer to talk it through?{' '}
+                    <a
+                      href={BOOKING_URL}
+                      target="_blank"
+                      rel="noopener"
+                      onClick={() => trackCta('post_score_book_call_link')}
+                      className="text-gray-500 hover:underline hover:text-gray-700 focus:outline-none focus:underline"
+                    >
+                      Book a free 15-min AI Visibility Review &rarr;
+                    </a>
+                  </p>
+                )}
 
                 {/* Full Report */}
                 {showFullReport && (

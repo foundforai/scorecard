@@ -103,67 +103,6 @@ function QuickScorecard({ quickScore }) {
   );
 }
 
-// ── Email Gate ────────────────────────────────────────────────────────────────
-function EmailGate({ url, onSuccess }) {
-  const [email, setEmail] = useState('');
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    setLoading(true);
-    setError('');
-    try {
-      const res = await fetch(FORMSPREE, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-        body: JSON.stringify({ email, url, source: 'AI Scorecard' }),
-      });
-      if (res.ok) {
-        onSuccess();
-      } else {
-        setError('Something went wrong. Please try again.');
-      }
-    } catch {
-      setError('Network error. Please try again.');
-    }
-    setLoading(false);
-  };
-
-  return (
-    <div className="absolute inset-0 flex items-center justify-center bg-white/80 backdrop-blur-sm rounded-2xl z-10 p-6">
-      <div className="w-full max-w-sm text-center">
-        <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
-          <svg className="w-6 h-6 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-          </svg>
-        </div>
-        <h3 className="text-lg font-bold text-gray-900 mb-1">Unlock Your Results</h3>
-        <p className="text-sm text-gray-500 mb-5">Enter your email to see your full AI visibility score and get actionable recommendations.</p>
-        <form onSubmit={handleSubmit} className="space-y-3">
-          <input
-            type="email"
-            required
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            placeholder="you@example.com"
-            className="w-full px-4 py-2.5 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-          />
-          {error && <p className="text-red-500 text-xs">{error}</p>}
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2.5 rounded-xl text-sm transition disabled:opacity-60"
-          >
-            {loading ? 'Sending…' : 'See My Score'}
-          </button>
-        </form>
-        <p className="text-xs text-gray-400 mt-3">No spam. Unsubscribe any time.</p>
-      </div>
-    </div>
-  );
-}
-
 // ── Full Report ───────────────────────────────────────────────────────────────
 function FullReport({ data }) {
   const priorityColor = { high: 'bg-red-50 text-red-700 border-red-200', medium: 'bg-amber-50 text-amber-700 border-amber-200', low: 'bg-blue-50 text-blue-700 border-blue-200' };
@@ -279,24 +218,51 @@ function FullReport({ data }) {
   );
 }
 
+// ── Measured-Against Logos ────────────────────────────────────────────────────
+function ModelBadge({ tag, name, bg, fg }) {
+  return (
+    <div className="flex items-center gap-2">
+      <span
+        className="inline-flex items-center justify-center w-9 h-9 rounded-lg text-[10px] font-bold tracking-wide"
+        style={{ background: bg, color: fg }}
+      >
+        {tag}
+      </span>
+      <span className="text-base font-semibold text-gray-700">{name}</span>
+    </div>
+  );
+}
+
 // ── Main Page ─────────────────────────────────────────────────────────────────
 export default function Home() {
   const [url, setUrl] = useState('');
+  const [email, setEmail] = useState('');
+  const [findFor, setFindFor] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [result, setResult] = useState(null);
-  const [emailUnlocked, setEmailUnlocked] = useState(false);
   const [showFullReport, setShowFullReport] = useState(false);
   const reportRef = useRef(null);
 
   const handleAnalyze = async (e) => {
     e.preventDefault();
-    if (!url.trim()) return;
+    if (!url.trim() || !email.trim() || !findFor.trim()) return;
     setLoading(true);
     setError('');
     setResult(null);
-    setEmailUnlocked(false);
     setShowFullReport(false);
+
+    // Fire-and-forget Formspree submission so the lead is captured even if analysis fails.
+    fetch(FORMSPREE, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+      body: JSON.stringify({
+        website: url,
+        email,
+        findFor,
+        source: 'AI Scorecard',
+      }),
+    }).catch(() => {});
 
     try {
       const res = await fetch('/api/analyze', {
@@ -313,10 +279,6 @@ export default function Home() {
     setLoading(false);
   };
 
-  const handleUnlock = () => {
-    setEmailUnlocked(true);
-  };
-
   const handleGetReport = () => {
     setShowFullReport(true);
     setTimeout(() => {
@@ -328,22 +290,24 @@ export default function Home() {
     window.print();
   };
 
+  const formReady = url.trim() && email.trim() && findFor.trim();
+
   return (
     <>
       <Head>
         <title>AI Visibility Scorecard — FoundForAI</title>
-        <meta name="description" content="Check how visible your business is to AI assistants like ChatGPT, Claude, and Bing Copilot. Get your free AI visibility score in seconds." />
+        <meta name="description" content="See exactly how ChatGPT, Gemini, Perplexity, and Claude describe — or ignore — your business. Free instant AI visibility report." />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
         <link rel="icon" href="/favicon.ico" />
-        <meta property="og:title" content="AI Visibility Scorecard — FoundForAI" />
-        <meta property="og:description" content="Find out if AI assistants can find and recommend your business. Free instant analysis." />
+        <meta property="og:title" content="Is AI Recommending Your Business? — FoundForAI" />
+        <meta property="og:description" content="Find out if ChatGPT, Gemini, Perplexity, and Claude can find and recommend you. Free instant analysis." />
         <meta property="og:type" content="website" />
       </Head>
 
       <div className="min-h-screen bg-gradient-to-b from-slate-50 to-white">
         {/* Nav */}
         <nav className="no-print border-b border-gray-100 bg-white/80 backdrop-blur-sm sticky top-0 z-20">
-          <div className="max-w-5xl mx-auto px-4 h-14 flex items-center justify-between">
+          <div className="max-w-6xl mx-auto px-4 h-14 flex items-center justify-between">
             <a href="https://foundforai.com" className="font-bold text-gray-900 text-sm">
               FoundForAI
             </a>
@@ -351,42 +315,55 @@ export default function Home() {
           </div>
         </nav>
 
-        <main className="max-w-2xl mx-auto px-4 py-12 pb-20">
+        <main className="max-w-6xl mx-auto px-4 py-12 sm:py-20 pb-20">
           {/* Hero */}
-          <div className="text-center mb-10 no-print">
-            <div className="inline-flex items-center gap-2 bg-blue-50 text-blue-700 text-xs font-semibold px-3 py-1.5 rounded-full mb-5 border border-blue-100">
-              <span className="w-1.5 h-1.5 bg-blue-500 rounded-full animate-pulse" />
-              Free Instant Analysis
+          <div className="text-center no-print">
+            <div className="inline-flex items-center bg-blue-50 text-blue-700 text-sm font-medium px-4 py-1.5 rounded-full mb-8 border border-blue-100">
+              The New Way to Be Discovered
             </div>
-            <h1 className="text-4xl sm:text-5xl font-extrabold text-gray-900 leading-tight mb-4">
-              Is Your Business<br />
-              <span className="text-blue-600">AI-Visible?</span>
+            <h1 className="text-5xl sm:text-6xl md:text-7xl font-extrabold text-gray-900 leading-[1.05] tracking-tight mb-6">
+              Is AI Recommending<br />
+              Your Business?
             </h1>
-            <p className="text-lg text-gray-500 max-w-md mx-auto">
-              See if ChatGPT, Claude, and Bing Copilot can find and recommend you — based on official AI standards from Google, Microsoft, OpenAI, and Anthropic.
+            <p className="text-lg sm:text-xl text-gray-500 max-w-2xl mx-auto leading-relaxed">
+              See exactly how ChatGPT, Gemini, Perplexity, and Claude describe — or ignore — your business. Free report, no credit card.
             </p>
           </div>
 
-          {/* URL Form */}
-          <form onSubmit={handleAnalyze} className="no-print mb-6">
-            <div className="flex gap-2 bg-white rounded-2xl border border-gray-200 shadow-sm p-2">
-              <div className="flex-1 flex items-center gap-2 pl-3">
-                <svg className="w-4 h-4 text-gray-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9" />
-                </svg>
-                <input
-                  type="text"
-                  value={url}
-                  onChange={(e) => setUrl(e.target.value)}
-                  placeholder="yourbusiness.com"
-                  className="flex-1 py-2 text-sm text-gray-900 placeholder-gray-400 focus:outline-none bg-transparent"
-                  disabled={loading}
-                />
-              </div>
+          {/* Form */}
+          <form onSubmit={handleAnalyze} className="no-print mt-10 max-w-5xl mx-auto">
+            <div className="flex flex-col md:flex-row gap-2 bg-white rounded-2xl border border-gray-200 shadow-sm p-2">
+              <input
+                type="text"
+                value={url}
+                onChange={(e) => setUrl(e.target.value)}
+                placeholder="yourbusiness.com"
+                className="flex-1 px-4 py-3 text-sm text-gray-900 placeholder-gray-400 focus:outline-none bg-transparent md:border-r md:border-gray-100"
+                disabled={loading}
+                required
+              />
+              <input
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="you@business.com"
+                className="flex-1 px-4 py-3 text-sm text-gray-900 placeholder-gray-400 focus:outline-none bg-transparent md:border-r md:border-gray-100"
+                disabled={loading}
+                required
+              />
+              <input
+                type="text"
+                value={findFor}
+                onChange={(e) => setFindFor(e.target.value)}
+                placeholder="What should AI find you for?"
+                className="flex-1 px-4 py-3 text-sm text-gray-900 placeholder-gray-400 focus:outline-none bg-transparent"
+                disabled={loading}
+                required
+              />
               <button
                 type="submit"
-                disabled={loading || !url.trim()}
-                className="bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white font-semibold px-5 py-2.5 rounded-xl text-sm transition flex items-center gap-2 flex-shrink-0"
+                disabled={loading || !formReady}
+                className="bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white font-semibold px-6 py-3 rounded-xl text-sm transition flex items-center justify-center gap-2 flex-shrink-0"
               >
                 {loading ? (
                   <>
@@ -397,7 +374,7 @@ export default function Home() {
                     Analyzing…
                   </>
                 ) : (
-                  'Analyze Now'
+                  'Get my free report'
                 )}
               </button>
             </div>
@@ -409,57 +386,76 @@ export default function Home() {
                 {error}
               </div>
             )}
+
+            {/* Trust row */}
+            <div className="flex flex-wrap items-center justify-center gap-x-8 gap-y-2 mt-5 text-sm text-gray-500">
+              <span className="inline-flex items-center gap-2">
+                <span className="text-gray-400">✓</span> Instant on-page report
+              </span>
+              <span className="inline-flex items-center gap-2">
+                <span className="text-gray-400">✓</span> Save as PDF
+              </span>
+              <span className="inline-flex items-center gap-2">
+                <span className="text-gray-400">✓</span> No credit card
+              </span>
+            </div>
           </form>
 
-          {/* Loading skeleton */}
-          {loading && (
-            <div className="space-y-3 animate-pulse no-print">
-              <div className="h-12 bg-gray-100 rounded-2xl" />
-              <div className="h-12 bg-gray-100 rounded-2xl" />
-              <div className="h-12 bg-gray-100 rounded-2xl" />
-              <div className="h-12 bg-gray-100 rounded-2xl" />
-              <div className="h-12 bg-gray-100 rounded-2xl" />
-              <div className="h-12 bg-gray-100 rounded-2xl" />
+          {/* Measured Against */}
+          {!result && !loading && (
+            <div className="no-print mt-16 sm:mt-24">
+              <div className="flex flex-wrap items-center justify-center gap-x-10 gap-y-6">
+                <span className="text-xs font-semibold tracking-[0.2em] text-gray-400 uppercase">
+                  Measured Against
+                </span>
+                <ModelBadge tag="GPT" name="ChatGPT" bg="#86efac" fg="#065f46" />
+                <ModelBadge tag="GEM" name="Gemini" bg="#a5b4fc" fg="#1e3a8a" />
+                <ModelBadge tag="PPX" name="Perplexity" bg="#a5f3fc" fg="#155e75" />
+                <ModelBadge tag="CLD" name="Claude" bg="#fdba74" fg="#7c2d12" />
+              </div>
             </div>
           )}
 
-          {/* Results */}
-          {result && !loading && (
-            <div className="space-y-5">
-              {/* Score + Quick Scorecard */}
-              <div className="relative">
-                <div className={emailUnlocked ? '' : 'pointer-events-none select-none'}>
-                  {/* Score summary row */}
-                  <div className="flex items-center justify-between mb-4 px-1">
-                    <div>
-                      <h2 className="font-bold text-gray-900">Your AI Visibility Score</h2>
-                      <p className="text-xs text-gray-500 mt-0.5">{result.url}</p>
-                    </div>
-                    <ScoreRing score={result.overallScore} grade={result.grade} />
-                  </div>
+          <div className="max-w-2xl mx-auto">
+            {/* Loading skeleton */}
+            {loading && (
+              <div className="space-y-3 animate-pulse no-print mt-10">
+                <div className="h-12 bg-gray-100 rounded-2xl" />
+                <div className="h-12 bg-gray-100 rounded-2xl" />
+                <div className="h-12 bg-gray-100 rounded-2xl" />
+                <div className="h-12 bg-gray-100 rounded-2xl" />
+                <div className="h-12 bg-gray-100 rounded-2xl" />
+                <div className="h-12 bg-gray-100 rounded-2xl" />
+              </div>
+            )}
 
-                  <div className={`transition-all duration-300 ${emailUnlocked ? '' : 'blur-md'}`}>
-                    <QuickScorecard quickScore={result.quickScore} />
+            {/* Results */}
+            {result && !loading && (
+              <div className="space-y-5 mt-10">
+                {/* Score summary row */}
+                <div className="flex items-center justify-between mb-4 px-1">
+                  <div>
+                    <h2 className="font-bold text-gray-900">Your AI Visibility Score</h2>
+                    <p className="text-xs text-gray-500 mt-0.5">{result.url}</p>
                   </div>
+                  <ScoreRing score={result.overallScore} grade={result.grade} />
                 </div>
 
-                {!emailUnlocked && (
-                  <EmailGate url={result.url} onSuccess={handleUnlock} />
-                )}
-              </div>
+                <QuickScorecard quickScore={result.quickScore} />
 
-              {/* CTA buttons after unlock */}
-              {emailUnlocked && (
+                {/* CTA buttons */}
                 <div className="flex flex-col sm:flex-row gap-3 no-print">
-                  <button
-                    onClick={handleGetReport}
-                    className="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 rounded-xl text-sm transition flex items-center justify-center gap-2"
-                  >
-                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                    </svg>
-                    Get Full Report
-                  </button>
+                  {!showFullReport && (
+                    <button
+                      onClick={handleGetReport}
+                      className="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 rounded-xl text-sm transition flex items-center justify-center gap-2"
+                    >
+                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                      </svg>
+                      Get Full Report
+                    </button>
+                  )}
                   {showFullReport && (
                     <button
                       onClick={handlePrint}
@@ -472,41 +468,41 @@ export default function Home() {
                     </button>
                   )}
                 </div>
-              )}
 
-              {/* Full Report */}
-              {showFullReport && (
-                <div ref={reportRef}>
-                  <FullReport data={result} />
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* How it works */}
-          {!result && !loading && (
-            <div className="mt-12 no-print">
-              <p className="text-center text-xs font-semibold tracking-widest text-gray-400 uppercase mb-6">What We Check</p>
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                {[
-                  { icon: '🗂', label: 'Schema.org Data' },
-                  { icon: '🤖', label: 'AI Crawler Access' },
-                  { icon: '📄', label: 'llms.txt' },
-                  { icon: '🗺', label: 'XML Sitemap' },
-                  { icon: '⚙️', label: 'Technical SEO' },
-                  { icon: '🏆', label: 'E-E-A-T Signals' },
-                ].map((item) => (
-                  <div key={item.label} className="bg-white rounded-xl border border-gray-100 shadow-sm px-4 py-3.5 flex items-center gap-3">
-                    <span className="text-xl">{item.icon}</span>
-                    <span className="text-xs font-medium text-gray-700">{item.label}</span>
+                {/* Full Report */}
+                {showFullReport && (
+                  <div ref={reportRef}>
+                    <FullReport data={result} />
                   </div>
-                ))}
+                )}
               </div>
-              <p className="text-center text-xs text-gray-400 mt-6">
-                Standards sourced directly from Google, Microsoft, OpenAI, Anthropic, schema.org, and llms.txt
-              </p>
-            </div>
-          )}
+            )}
+
+            {/* How it works */}
+            {!result && !loading && (
+              <div className="mt-20 no-print">
+                <p className="text-center text-xs font-semibold tracking-widest text-gray-400 uppercase mb-6">What We Check</p>
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                  {[
+                    { icon: '🗂', label: 'Schema.org Data' },
+                    { icon: '🤖', label: 'AI Crawler Access' },
+                    { icon: '📄', label: 'llms.txt' },
+                    { icon: '🗺', label: 'XML Sitemap' },
+                    { icon: '⚙️', label: 'Technical SEO' },
+                    { icon: '🏆', label: 'E-E-A-T Signals' },
+                  ].map((item) => (
+                    <div key={item.label} className="bg-white rounded-xl border border-gray-100 shadow-sm px-4 py-3.5 flex items-center gap-3">
+                      <span className="text-xl">{item.icon}</span>
+                      <span className="text-xs font-medium text-gray-700">{item.label}</span>
+                    </div>
+                  ))}
+                </div>
+                <p className="text-center text-xs text-gray-400 mt-6">
+                  Standards sourced directly from Google, Microsoft, OpenAI, Anthropic, schema.org, and llms.txt
+                </p>
+              </div>
+            )}
+          </div>
         </main>
       </div>
     </>
